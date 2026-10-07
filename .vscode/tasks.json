@@ -1,0 +1,138 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "一键打包 Windows exe",
+			"detail": "关闭正在运行的程序 → 安装依赖 → 下载内置工具 → 构建 NSIS 安装包与 zip，产物在 packages/app/dist",
+			"type": "shell",
+			"command": "pnpm run package:win",
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			},
+			"problemMatcher": [
+				"$tsc"
+			]
+		},
+		{
+			"label": "重新打包 exe（跳过依赖与工具下载）",
+			"detail": "依赖与内置工具已就绪时使用，会先关闭正在运行的程序",
+			"type": "shell",
+			"command": "pnpm run package:win:rebuild",
+			"problemMatcher": [
+				"$tsc"
+			]
+		},
+		{
+			"label": "准备打包环境（安装依赖）",
+			"type": "shell",
+			"command": "pnpm install",
+			"problemMatcher": []
+		},
+		{
+			"label": "下载内置工具",
+			"type": "shell",
+			"command": "pnpm run install:bin",
+			"problemMatcher": []
+		},
+		{
+			"label": "格式化代码",
+			"type": "shell",
+			"command": "pnpm run format",
+			"problemMatcher": []
+		},
+		{
+			"label": "重新打包 exe（跳过依赖与工具下载）",
+			"type": "shell",
+			"command": "pnpm run package:win:rebuild",
+			"problemMatcher": [
+				"$tsc"
+			],
+			"group": "build"
+		},
+		{
+			"label": "格式化代码",
+			"type": "shell",
+			"command": "pnpm run format",
+			"problemMatcher": []
+		},
+		{
+			"label": "重新打包 exe（跳过依赖与工具下载）",
+			"type": "shell",
+			"command": "pnpm run package:win:rebuild",
+			"problemMatcher": [
+				"$tsc"
+			],
+			"group": "build"
+		},
+		{
+			"label": "格式化代码",
+			"type": "shell",
+			"command": "pnpm run format",
+			"problemMatcher": []
+		},
+		{
+			"label": "重新打包 exe（跳过依赖与工具下载）",
+			"type": "shell",
+			"command": "pnpm run package:win:rebuild",
+			"problemMatcher": [
+				"$tsc"
+			],
+			"group": "build"
+		},
+		{
+			"label": "重新打包 exe（跳过依赖与工具下载）",
+			"type": "shell",
+			"command": "pnpm run package:win:rebuild",
+			"problemMatcher": [
+				"$tsc"
+			],
+			"group": "build"
+		},
+		{
+			"label": "格式化代码",
+			"type": "shell",
+			"command": "pnpm run format",
+			"problemMatcher": []
+		},
+		{
+			"label": "重新打包 exe（跳过依赖与工具下载）",
+			"type": "shell",
+			"command": "pnpm run package:win:rebuild",
+			"problemMatcher": [
+				"$tsc"
+			],
+			"group": "build"
+		},
+		{
+			"label": "格式化代码",
+			"type": "shell",
+			"command": "pnpm run format",
+			"problemMatcher": []
+		},
+		{
+			"label": "重新打包 exe（跳过依赖与工具下载）",
+			"type": "shell",
+			"command": "pnpm run package:win:rebuild",
+			"problemMatcher": [
+				"$tsc"
+			],
+			"group": "build"
+		},
+		{
+			"label": "格式化代码",
+			"type": "shell",
+			"command": "pnpm run format",
+			"problemMatcher": []
+		},
+		{
+			"label": "重新打包 exe（跳过依赖与工具下载）",
+			"type": "shell",
+			"command": "pnpm run package:win:rebuild",
+			"problemMatcher": [
+				"$tsc"
+			],
+			"group": "build"
+		}
+	]
+}

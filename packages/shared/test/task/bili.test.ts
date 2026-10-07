@@ -197,4 +197,45 @@ describe("preFormatOptions", () => {
       { path: "C:/videos/part-1-弹幕版.mp4", title: "P9-弹幕版-part-1-弹幕版" },
     ]);
   });
+
+  it("元数据全为 null 时依然解析 {{filename}} 等占位符", async () => {
+    vi.mocked(pasrseMetadata).mockResolvedValue({
+      title: null,
+      username: null,
+      roomId: null,
+      startTimestamp: null,
+      platform: null,
+    });
+
+    const result = await preFormatOptions(
+      createConfig({
+        title: "{{filename}}",
+        desc: "{{title}}-{{filename}}",
+        partTitleTemplate: "P{{index}}-{{filename}}",
+        copyright: 1,
+      }),
+      ["C:/videos/my-video.mp4"],
+    );
+
+    expect(result.options.title).toBe("my-video");
+    expect(result.options.desc).toBe("-my-video");
+    expect(result.videos).toEqual([{ path: "C:/videos/my-video.mp4", title: "P1-my-video" }]);
+  });
+
+  it("元数据全为 null 导致标题为空时回退为文件名", async () => {
+    vi.mocked(pasrseMetadata).mockResolvedValue({
+      title: null,
+      username: null,
+      roomId: null,
+      startTimestamp: null,
+      platform: null,
+    });
+
+    const result = await preFormatOptions(
+      createConfig({ title: "{{title}}-{{user}}", copyright: 1 }),
+      ["C:/videos/fallback-name.mp4"],
+    );
+
+    expect(result.options.title).toBe("fallback-name");
+  });
 });

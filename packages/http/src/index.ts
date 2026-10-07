@@ -28,8 +28,10 @@ import filesRouter from "./routes/files.js";
 import danmaRouter from "./routes/danma.js";
 import syncRouter from "./routes/sync.js";
 import aiRouter from "./routes/ai.js";
+import watchUploadRouter from "./routes/watchUpload.js";
 import { WebhookHandler } from "./services/webhook/webhook.js";
 import { createFileCache } from "./services/fileCache.js";
+import { WatchUploadService } from "./services/watchUpload.js";
 
 import type { GlobalConfig } from "@biliLive-tools/types";
 import type { AwilixContainer } from "awilix";
@@ -38,6 +40,7 @@ import type { AppConfig, GlobalContainer } from "@biliLive-tools/shared";
 export let config: GlobalConfig;
 export let handler!: WebhookHandler;
 export let appConfig!: AppConfig;
+export let watchUploadService!: WatchUploadService;
 export let container!: AwilixContainer<GlobalContainer>;
 export const fileCache = createFileCache();
 
@@ -102,6 +105,8 @@ export async function serverStart(
   config = container.resolve("globalConfig");
   appConfig = container.resolve("appConfig");
   handler = new WebhookHandler(appConfig);
+  watchUploadService = new WatchUploadService(appConfig, config.videoPresetPath);
+  watchUploadService.start();
 
   if (options.auth) {
     const passKey = process.env.BILILIVE_TOOLS_PASSKEY || options.passKey;
@@ -124,6 +129,7 @@ export async function serverStart(
   app.use(danmaRouter.routes());
   app.use(syncRouter.routes());
   app.use(aiRouter.routes());
+  app.use(watchUploadRouter.routes());
 
   app.use(SSERouter.routes());
   app.use(router.allowedMethods());

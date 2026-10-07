@@ -30,7 +30,6 @@ export const DEFAULT_BILIUP_CONFIG: BiliupConfig = {
   is_only_self: 0,
   space_hidden: 2,
   act_reserve: undefined,
-
 };
 
 export class VideoPreset extends CommonPreset<BiliupConfig> {

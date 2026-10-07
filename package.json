@@ -16,6 +16,9 @@
     "build:base": "pnpm run --filter @biliLive-tools/types --filter douyin-danma-listener --filter @biliLive-tools/shared build && pnpm --filter @biliLive-tools/http --filter @bililive-tools/* --parallel run build",
     "preinstall": "npx only-allow pnpm",
     "install:bin": "node ./scripts/install-bin.js",
+    "kill:app": "node ./scripts/kill-app.js",
+    "package:win": "pnpm run kill:app && pnpm install && pnpm run install:bin && pnpm run build:app",
+    "package:win:rebuild": "pnpm run kill:app && pnpm run build:app",
     "github-ci-pnpm-update": "node ./scripts/github-ci-pnpm-update.js",
     "test": "vitest run",
     "format": "prettier . --write"

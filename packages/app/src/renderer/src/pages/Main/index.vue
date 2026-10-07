@@ -299,6 +299,19 @@ const menuOptions = computed<MenuOption[]>(() => {
         ),
     },
     {
+      key: "WatchUpload",
+      label: () =>
+        h(
+          RouterLink,
+          {
+            to: {
+              name: "WatchUpload",
+            },
+          },
+          { default: () => "监听上传" },
+        ),
+    },
+    {
       key: "DanmakuFactory",
       label: () =>
         h(

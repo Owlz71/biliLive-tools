@@ -12,6 +12,7 @@ import videoApi from "./video";
 import recordHistoryApi from "./recordHistory";
 import danmaApi from "./danma";
 import aiApi from "./ai";
+import watchUploadApi from "./watchUpload";
 
 import syncApi from "./sync";
 
@@ -30,4 +31,5 @@ export {
   recordHistoryApi,
   danmaApi,
   aiApi,
+  watchUploadApi,
 };

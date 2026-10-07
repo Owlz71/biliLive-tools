@@ -25,6 +25,8 @@
       <BiliSetting
         ref="biliSettingRef"
         v-model="options.uploadPresetId"
+        file-preview
+        :preview-filename="previewFilename"
         @change="handlePresetOptions"
       ></BiliSetting>
     </div>
@@ -182,6 +184,11 @@ const clear = () => {
 };
 
 const biliSettingRef = ref<InstanceType<typeof BiliSetting> | null>(null);
+// 预览模板时用的真实文件名（不能用 fileList[0].title，那个会被用户改成分P标题）
+const previewFilename = computed(() => {
+  const filePath = fileList.value[0]?.path;
+  return filePath ? window.path.parse(filePath).name : "";
+});
 // 只提示一次，清空提示
 const hasNotice = ref(false);
 const notification = useNotification();

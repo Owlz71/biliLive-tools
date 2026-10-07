@@ -892,6 +892,31 @@ export interface AppConfig {
     // mode: "watch" | "interval";
     startTime: number;
   };
+  // 监听上传
+  watchUpload: {
+    config: {
+      // uuid
+      id: string;
+      /** 是否启用 */
+      switch: boolean;
+      /** 监听文件夹 */
+      watchFolder: string;
+      /** 上传预设 */
+      uploadPresetId: string;
+      /** 轮询间隔（秒） */
+      intervalSeconds: number;
+      /** 跳过最新的文件，开启后文件夹里最后一个视频不会自动上传 */
+      skipLatest: boolean;
+      /** 最新文件的等待时间（秒）：最新文件超过这个时间没有变化才认为录制结束并上传，默认 1 天 */
+      silentSeconds: number;
+      /** 文件匹配规则，只有匹配的文件才会被处理 */
+      fileMatchRegex: string;
+      /** 忽略文件正则，匹配的文件将被忽略 */
+      ignoreFileRegex: string;
+      /** 审核通过后移除源文件 */
+      removeOriginAfterUploadCheck: boolean;
+    }[];
+  };
 }
 
 export interface Video2Mp4Options {

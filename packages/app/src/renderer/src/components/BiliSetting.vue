@@ -524,10 +524,15 @@ const props = withDefaults(
     mode?: "full" | "edit-only";
     presetId?: string;
     showActionButtons?: boolean;
+    /** 预览时使用的真实文件名（不含扩展名），为空时使用示例数据 */
+    previewFilename?: string;
+    /** 是否处于“选择文件后上传”的页面，用于在未选择文件时给出提示 */
+    filePreview?: boolean;
   }>(),
   {
     mode: "full",
     showActionButtons: true,
+    filePreview: false,
   },
 );
 const emits = defineEmits<{
@@ -1171,6 +1176,33 @@ const setPartTitleVar = async (value: string) => {
     options.value.config.partTitleTemplate = (options.value.config.partTitleTemplate || "") + value;
   }
 };
+/**
+ * 构建预览上下文
+ * 选择了文件就用真实文件名，否则返回 undefined 让后端使用示例数据
+ */
+const getPreviewOptions = () => {
+  if (!props.previewFilename) return undefined;
+  return {
+    title: "",
+    username: "",
+    time: new Date().toISOString(),
+    roomId: "",
+    filename: props.previewFilename,
+  };
+};
+
+/** 模板里用到 filename 但还没选文件时提示用户 */
+const needPreviewFilename = (template?: string) => {
+  if (!props.filePreview) return false;
+  if (!template || !template.includes("filename")) return false;
+  if (props.previewFilename) return false;
+  notice.warning({
+    title: "请先添加视频文件，预览才能显示真实的文件名",
+    duration: 2500,
+  });
+  return true;
+};
+
 const previewPartTitle = async (template: string) => {
   if (!template) {
     notice.warning({
@@ -1179,7 +1211,12 @@ const previewPartTitle = async (template: string) => {
     });
     return;
   }
-  const data = await biliApi.formatWebhookPartTitle(template);
+  if (needPreviewFilename(template)) return;
+  const previewOptions = getPreviewOptions();
+  const data = await biliApi.formatWebhookPartTitle(
+    template,
+    previewOptions ? { ...previewOptions, index: 1 } : undefined,
+  );
   notice.info({
     title: data,
     duration: 3000,
@@ -1187,7 +1224,15 @@ const previewPartTitle = async (template: string) => {
 };
 
 const previewTitle = async (template: string) => {
-  const data = await biliApi.formatWebhookTitle(template);
+  if (!template) {
+    notice.warning({
+      title: "请输入视频标题",
+      duration: 2000,
+    });
+    return;
+  }
+  if (needPreviewFilename(template)) return;
+  const data = await biliApi.formatWebhookTitle(template, getPreviewOptions());
   notice.warning({
     title: data,
     duration: 3000,
@@ -1239,7 +1284,8 @@ const previewDesc = async (template: string) => {
     });
     return;
   }
-  const data = await biliApi.formatWebhookDesc(template);
+  if (needPreviewFilename(template)) return;
+  const data = await biliApi.formatWebhookDesc(template, getPreviewOptions());
   notice.info({
     title: data,
     duration: 3000,

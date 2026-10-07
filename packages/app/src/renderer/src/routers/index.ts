@@ -49,6 +49,14 @@ const router = createRouter({
           },
         },
         {
+          path: "/watchUpload",
+          name: "WatchUpload",
+          component: () => import("../pages/Tools/pages/WatchUpload/Index.vue"),
+          meta: {
+            title: "监听上传",
+          },
+        },
+        {
           path: "/danmakufactory",
           name: "DanmakuFactory",
           component: () => import("../pages/Tools/pages/DanmuFactory.vue"),

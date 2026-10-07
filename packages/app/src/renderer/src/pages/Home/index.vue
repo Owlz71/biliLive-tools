@@ -77,6 +77,8 @@
       <n-tab-pane name="upload-setting" tab="上传设置" display-directive="show">
         <BiliSetting
           v-model="clientOptions.uploadPresetId"
+          file-preview
+          :preview-filename="previewFilename"
           @change="handlePresetOptions"
         ></BiliSetting>
       </n-tab-pane>
@@ -205,6 +207,9 @@ const fileList = ref<
     taskId?: string;
   })[]
 >([]);
+
+// 预览模板时用的真实文件名
+const previewFilename = computed(() => fileList.value[0]?.name || "");
 
 const clientOptions = toReactive(
   computed({

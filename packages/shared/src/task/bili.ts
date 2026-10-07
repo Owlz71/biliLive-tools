@@ -587,21 +587,38 @@ async function resolveUploadFileMeta(
   }
 }
 
-function getUploadFormatContext(
+/**
+ * 构建模板格式化上下文
+ *
+ * 不再要求元数据完整：文件名始终可用，所以 `{{filename}}` 这类占位符在普通本地视频
+ * （非本软件录制、无同名弹幕文件）上也能正常解析。
+ * 元数据缺失的字段回退为空字符串，时间回退为文件修改时间，最后回退为当前时间。
+ */
+async function getUploadFormatContext(
   meta: UploadFileMeta | null,
   filePath: string,
-): UploadFormatContext | null {
-  if (!meta?.title || !meta.username || !meta.roomId || !meta.startTimestamp) {
-    return null;
+): Promise<UploadFormatContext> {
+  const filename = path.parse(filePath).name;
+
+  let time: string;
+  if (meta?.startTimestamp) {
+    time = new Date(meta.startTimestamp * 1000).toISOString();
+  } else {
+    try {
+      const stat = await fs.stat(filePath);
+      time = new Date(stat.mtimeMs || stat.ctimeMs).toISOString();
+    } catch (e) {
+      log.warn(`读取视频文件时间失败，使用当前时间：${filePath}`, e);
+      time = new Date().toISOString();
+    }
   }
 
-  const filename = path.parse(filePath).name;
   return {
-    title: meta.title,
-    username: meta.username,
-    time: new Date(meta.startTimestamp * 1000).toISOString(),
-    roomId: meta.roomId,
-    filename: filename,
+    title: meta?.title ?? "",
+    username: meta?.username ?? "",
+    time,
+    roomId: meta?.roomId ?? "",
+    filename,
   };
 }
 
@@ -650,15 +667,18 @@ export async function preFormatOptions(
   if (needParseForTitle || needParseForDesc || needParseForSource) {
     const firstFile = normalizedFiles[0];
     const firstMeta = await resolveUploadFileMeta(firstFile, "解析视频文件信息失败");
-    const firstFormatContext = getUploadFormatContext(firstMeta, firstFile.path);
+    const firstFormatContext = await getUploadFormatContext(firstMeta, firstFile.path);
 
     // 格式化主标题
-    if (needParseForTitle && firstFormatContext) {
-      resultOptions.title = formatTitle(firstFormatContext, options.title);
+    if (needParseForTitle) {
+      const formattedTitle = formatTitle(firstFormatContext, options.title);
+      // 元数据缺失时（例如模板只有占位符）避免提交空标题或只剩分隔符的标题，回退为文件名
+      const isEmptyTitle = formattedTitle.replace(/[\s\-_|/\\【】()[\]（）·.,:：]+/g, "") === "";
+      resultOptions.title = isEmptyTitle ? firstFormatContext.filename : formattedTitle;
     }
 
     // 格式化简介
-    if (needParseForDesc && firstFormatContext) {
+    if (needParseForDesc) {
       resultOptions.desc = formatDesc(firstFormatContext, options.desc!);
     }
 
@@ -687,21 +707,16 @@ export async function preFormatOptions(
     for (let i = 0; i < normalizedFiles.length; i++) {
       const item = normalizedFiles[i];
       const itemMeta = await resolveUploadFileMeta(item, `解析分P[${i + 1}]元数据失败，使用原标题`);
-      const itemFormatContext = getUploadFormatContext(itemMeta, item.path);
+      const itemFormatContext = await getUploadFormatContext(itemMeta, item.path);
 
-      if (itemFormatContext) {
-        const formattedTitle = formatPartTitle(
-          {
-            ...itemFormatContext,
-            index: itemMeta?.index ?? i + 1,
-          },
-          options.partTitleTemplate!,
-        );
-        videos.push({ path: item.path, title: formattedTitle });
-      } else {
-        videos.push({ path: item.path, title: item.title });
-        log.warn(`分P[${i + 1}]元数据不完整，使用原标题`);
-      }
+      const formattedTitle = formatPartTitle(
+        {
+          ...itemFormatContext,
+          index: itemMeta?.index ?? i + 1,
+        },
+        options.partTitleTemplate!,
+      );
+      videos.push({ path: item.path, title: formattedTitle || item.title });
     }
   } else {
     // 不需要格式化分P标题，使用原标题

@@ -10,6 +10,7 @@ import VideoSubModel from "./model/videoSub.js";
 import RecordHistoryModel from "./model/recordHistory.js";
 import UploadPartModel from "./model/uploadPart.js";
 import SubtitleStyleModel from "./model/subtitleStyle.js";
+import WatchUploadRecordModel from "./model/watchUploadRecord.js";
 
 import StatisticsService from "./service/statisticsService.js";
 import VirtualRecordService from "./service/virtualRecordService.js";
@@ -20,6 +21,7 @@ import RecordHistoryService from "./service/recordHistoryService.js";
 import UploadPartService from "./service/uploadPartService.js";
 import DanmuService from "./service/danmuService.js";
 import SubtitleStyleService from "./service/subtitleStyleService.js";
+import WatchUploadRecordService from "./service/watchUploadRecordService.js";
 
 import type { Database as DatabaseType } from "better-sqlite3";
 
@@ -39,6 +41,7 @@ export interface Container {
   recordHistoryModel: RecordHistoryModel;
   uploadPartModel: UploadPartModel;
   subtitleStyleModel: SubtitleStyleModel;
+  watchUploadRecordModel: WatchUploadRecordModel;
 
   statisticsService: StatisticsService;
   virtualRecordService: VirtualRecordService;
@@ -49,6 +52,7 @@ export interface Container {
   uploadPartService: UploadPartService;
   danmuService: DanmuService;
   subtitleStyleService: SubtitleStyleService;
+  watchUploadRecordService: WatchUploadRecordService;
 }
 
 /**
@@ -103,6 +107,7 @@ export function setupContainer(dbRootPath: string) {
     recordHistoryModel: asClass(RecordHistoryModel).singleton(),
     uploadPartModel: asClass(UploadPartModel).singleton(),
     subtitleStyleModel: asClass(SubtitleStyleModel).singleton(),
+    watchUploadRecordModel: asClass(WatchUploadRecordModel).singleton(),
   });
 
   // Register all Services
@@ -116,6 +121,7 @@ export function setupContainer(dbRootPath: string) {
     uploadPartService: asClass(UploadPartService).singleton(),
     danmuService: asClass(DanmuService).singleton(),
     subtitleStyleService: asClass(SubtitleStyleService).singleton(),
+    watchUploadRecordService: asClass(WatchUploadRecordService).singleton(),
   });
 
   return container;

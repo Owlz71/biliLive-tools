@@ -66,6 +66,7 @@ export default defineConfig({
             { text: "Webhook", link: "/features/webhook" },
             { text: "FFmpeg配置", link: "/features/ffmpeg" },
             { text: "B站上传", link: "/features/bilibili-upload" },
+            { text: "监听上传", link: "/features/watch-upload" },
             { text: "XML弹幕转换", link: "/features/danmaku-convert" },
             { text: "视频切片", link: "/features/video-clip" },
             { text: "文件同步", link: "/features/file-sync" },

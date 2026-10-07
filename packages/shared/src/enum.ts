@@ -445,6 +445,9 @@ export const APP_DEFAULT_CONFIG: AppConfig = {
     config: [],
     startTime: Date.now(),
   },
+  watchUpload: {
+    config: [],
+  },
 };
 
 export const nvencPresets = [
