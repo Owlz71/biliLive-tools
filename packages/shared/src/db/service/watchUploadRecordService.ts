@@ -25,6 +25,11 @@ export default class WatchUploadRecordService {
     return this.watchUploadRecordModel.filterNewPaths(paths, cooldownMs);
   }
 
+  /** 按路径批量获取记录状态（用于续传模式下判断分P顺序） */
+  getStatusesByPaths(paths: string[]) {
+    return this.watchUploadRecordModel.getStatusesByPaths(paths);
+  }
+
   /** 把遗留的「上传中」记录标记为失败 */
   markAllUploadingAsError(error?: string) {
     return this.watchUploadRecordModel.markAllUploadingAsError(error);

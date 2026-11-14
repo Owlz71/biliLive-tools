@@ -48,31 +48,33 @@ import { useBreakpoints } from "@renderer/hooks";
 
 const { appConfig } = storeToRefs(useAppConfig());
 
+type MediaItem = {
+  stat: {
+    aid: number;
+    [key: string]: any;
+  };
+  Archive: {
+    title: string;
+    cover: string;
+    [key: string]: any;
+  };
+  [key: string]: any;
+};
+
 const showModal = defineModel<boolean>("visible", { required: true, default: false });
 const aid = defineModel<string>({ required: false });
 const emits = defineEmits<{
-  confirm: [aid: string];
+  confirm: [aid: string, item?: MediaItem];
 }>();
 const notice = useNotification();
 const { isMobile } = useBreakpoints();
 
-const list = ref<
-  {
-    stat: {
-      aid: number;
-      [key: string]: any;
-    };
-    Archive: {
-      title: string;
-      cover: string;
-      [key: string]: any;
-    };
-    [key: string]: any;
-  }[]
->([]);
+const list = ref<MediaItem[]>([]);
 
 const page = ref(1);
 const pageCount = ref(1);
+/** 当前选中的稿件（用于把标题等信息带给父组件） */
+const selectedItem = ref<MediaItem | null>(null);
 
 watch(
   () => page.value,
@@ -106,6 +108,7 @@ const handleOpen = () => {
 };
 const close = () => {
   aid.value = "";
+  selectedItem.value = null;
   showModal.value = false;
 };
 
@@ -113,11 +116,12 @@ const confirm = async () => {
   if (!aid.value) {
     return;
   }
-  emits("confirm", aid.value);
+  emits("confirm", aid.value, selectedItem.value ?? undefined);
   showModal.value = false;
 };
 
-const selectMedia = (item) => {
+const selectMedia = (item: MediaItem) => {
+  selectedItem.value = item;
   aid.value = String(item.Archive.aid);
 };
 </script>

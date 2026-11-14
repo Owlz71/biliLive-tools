@@ -20,6 +20,7 @@ import { appConfig } from "../config.js";
 import { AbstractTask } from "./core/index.js";
 
 import type { TaskEvents } from "./core/index.js";
+import type { SubmitGate } from "./core/submitGate.js";
 import type ffmpeg from "@renmu/fluent-ffmpeg";
 import type { Client, WebVideoUploader } from "@renmu/bili-api";
 import type { Progress, BiliupConfig } from "@biliLive-tools/types";
@@ -813,6 +814,8 @@ export class BiliEditVideoTask extends BiliVideoTask {
   aid: number;
   mediaOptions: BiliupConfig;
   sortParams?: { filePath: string; cid?: number }[];
+  /** 提交顺序闸门：保证相同目标的任务按创建顺序提交 edit 请求 */
+  submitGate?: SubmitGate;
   constructor(
     options: {
       name: string;
@@ -820,6 +823,7 @@ export class BiliEditVideoTask extends BiliVideoTask {
       mediaOptions: BiliupConfig;
       aid: number;
       sortParams?: { filePath: string; cid?: number }[];
+      submitGate?: SubmitGate;
     },
     callback: {
       onStart?: () => void;
@@ -832,12 +836,31 @@ export class BiliEditVideoTask extends BiliVideoTask {
     this.aid = options.aid;
     this.mediaOptions = options.mediaOptions;
     this.sortParams = options.sortParams;
+    this.submitGate = options.submitGate;
+
+    if (this.submitGate) {
+      const release = this.submitGate.release;
+      // 无论成功、失败还是取消都要放行下一个任务，避免阻塞
+      this.on("task-end", release);
+      this.on("task-error", release);
+      this.on("task-cancel", release);
+      this.on("task-removed-queue", release);
+    }
 
     this.on("completed", () => {
       this.submit();
     });
   }
   async submit() {
+    // 顺序闸门：等待前一个任务提交完成，保证分P按创建顺序（从旧到新）追加
+    if (this.submitGate) {
+      this.name = `${this.rawName}（等待上一个分P提交）`;
+      await this.submitGate.prev;
+      this.name = this.rawName;
+      // 等待期间任务可能已被取消
+      if (this.status === "canceled") return;
+    }
+
     // 检查投稿最短间隔
     const config = appConfig.getAll();
     const minUploadInterval = config?.biliUpload?.minUploadInterval || 0;

@@ -90,7 +90,22 @@ export default class WatchUploadRecordModel extends BaseModel<BaseWatchUploadRec
     const exists = new Set(rows.map((item) => item.path));
     return paths.filter((item) => !exists.has(item));
   }
+  /** 按路径批量获取记录状态（用于续传模式下判断分P顺序） */
+  getStatusesByPaths(paths: string[]): Record<string, WatchUploadRecordStatus> {
+    if (paths.length === 0) return {};
 
+    const placeholders = paths.map(() => "?").join(", ");
+    const sql = `SELECT path, status FROM ${this.tableName} WHERE path IN (${placeholders})`;
+    const rows = this.db.prepare(sql).all(...paths) as {
+      path: string;
+      status: WatchUploadRecordStatus;
+    }[];
+    const result: Record<string, WatchUploadRecordStatus> = {};
+    for (const row of rows) {
+      result[row.path] = row.status;
+    }
+    return result;
+  }
   /**
    * 把遗留的「上传中」记录标记为失败（软件重启后不可能还有正在进行的上传）
    *

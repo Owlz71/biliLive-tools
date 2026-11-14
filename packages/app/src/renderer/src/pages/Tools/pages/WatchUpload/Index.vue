@@ -45,6 +45,13 @@
             <n-text>{{ presetName(item.uploadPresetId) }}</n-text>
           </div>
           <div class="info-item">
+            <n-text depth="3">续传：</n-text>
+            <n-text v-if="item.appendVideo && item.appendAid">
+              是（{{ item.appendTitle || `aid: ${item.appendAid}` }}）
+            </n-text>
+            <n-text v-else>否</n-text>
+          </div>
+          <div class="info-item">
             <n-text depth="3">轮询间隔：</n-text>
             <n-text>{{ item.intervalSeconds }} 秒</n-text>
             <n-text depth="3" style="margin-left: 12px">静默时间：</n-text>
@@ -170,6 +177,38 @@
               placeholder="请选择上传预设"
             />
           </n-form-item>
+          <n-form-item label="续传到已有视频" path="appendAid">
+            <n-space vertical style="width: 100%">
+              <n-space align="center">
+                <n-switch v-model:value="editingConfig.appendVideo" />
+                <n-text depth="3" style="font-size: 12px">
+                  开启后该文件夹的新文件会按修改时间从旧到新追加为所选视频的新分P，不再新建稿件
+                </n-text>
+              </n-space>
+              <template v-if="editingConfig.appendVideo">
+                <n-space align="center">
+                  <n-button size="small" @click="openAppendPicker">选择视频</n-button>
+                  <n-text v-if="editingConfig.appendAid" style="word-break: break-all">
+                    {{ editingConfig.appendTitle || "（未知标题）" }}（aid:
+                    {{ editingConfig.appendAid }}）
+                  </n-text>
+                  <n-text v-else type="warning">未选择视频</n-text>
+                  <n-button
+                    v-if="editingConfig.appendAid"
+                    size="tiny"
+                    text
+                    type="error"
+                    @click="clearAppendVideo"
+                  >
+                    清除
+                  </n-button>
+                </n-space>
+                <n-text depth="3" style="font-size: 12px">
+                  续传只会增加分P，不会对稿件进行编辑；合集内的稿件无法添加分P
+                </n-text>
+              </template>
+            </n-space>
+          </n-form-item>
           <n-form-item label="轮询间隔（秒）">
             <n-input-number
               v-model:value="editingConfig.intervalSeconds"
@@ -222,6 +261,13 @@
         </template>
       </n-card>
     </n-modal>
+
+    <!-- 选择续传的目标视频 -->
+    <AppendVideoDialog
+      v-model:visible="appendVideoVisible"
+      v-model="appendPickerAid"
+      @confirm="onAppendVideoConfirm"
+    />
   </div>
 </template>
 
@@ -233,6 +279,7 @@ import { showDirectoryDialog } from "@renderer/utils/fileSystem";
 import { useConfirm, useBreakpoints } from "@renderer/hooks";
 import { uuid, formatTime } from "@renderer/utils";
 import Tip from "@renderer/components/Tip.vue";
+import AppendVideoDialog from "@renderer/components/AppendVideoDialog.vue";
 import watchUploadApi from "@renderer/apis/watchUpload";
 import { useAppConfig, useUserInfoStore, useUploadPreset } from "@renderer/stores";
 
@@ -265,7 +312,8 @@ const watchConfigs = computed<WatchUploadConfigItem[]>(
   () => (appConfig.value.watchUpload?.config ?? []) as WatchUploadConfigItem[],
 );
 const presetName = (id: string) => {
-  return uploaPresetsOptions.value.find((item: any) => item.value === id)?.label ?? id ?? "未设置";
+  if (!id) return "未设置";
+  return uploaPresetsOptions.value.find((item: any) => item.value === id)?.label ?? id;
 };
 
 /** 秒数转成好读的文案 */
@@ -281,7 +329,8 @@ const createDefaultConfig = (): WatchUploadConfigItem => ({
   id: uuid(),
   switch: true,
   watchFolder: "",
-  uploadPresetId: uploaPresetsOptions.value[0]?.value ?? "default",
+  // 默认不选预设，强制手动选择（「默认配置」预设的标题为空，新建稿件会因校验失败而上传不了）
+  uploadPresetId: "",
   intervalSeconds: 60,
   skipLatest: false,
   // 最新文件的等待时间，默认 1 天
@@ -289,6 +338,7 @@ const createDefaultConfig = (): WatchUploadConfigItem => ({
   fileMatchRegex: "",
   ignoreFileRegex: "",
   removeOriginAfterUploadCheck: false,
+  appendVideo: false,
 });
 
 // 配置编辑
@@ -306,6 +356,14 @@ const formRules = {
     required: true,
     message: "请选择上传预设",
     trigger: ["blur", "change"],
+  },
+  appendAid: {
+    validator: () => {
+      if (!editingConfig.value.appendVideo) return true;
+      if (editingConfig.value.appendAid) return true;
+      return new Error("请选择要续传的视频");
+    },
+    trigger: ["change"],
   },
 };
 const labelWidth = computed(() => (isMobile.value ? "100px" : "130px"));
@@ -326,6 +384,29 @@ const selectFolder = async () => {
   const file = await showDirectoryDialog({ defaultPath: editingConfig.value.watchFolder });
   if (!file) return;
   editingConfig.value.watchFolder = file;
+};
+
+// 续传目标视频选择
+const appendVideoVisible = ref(false);
+const appendPickerAid = ref("");
+
+const openAppendPicker = () => {
+  appendPickerAid.value = editingConfig.value.appendAid
+    ? String(editingConfig.value.appendAid)
+    : "";
+  appendVideoVisible.value = true;
+};
+
+const onAppendVideoConfirm = (aid: string, item?: { Archive?: { title?: string } }) => {
+  editingConfig.value.appendAid = Number(aid);
+  if (item?.Archive?.title) {
+    editingConfig.value.appendTitle = item.Archive.title;
+  }
+};
+
+const clearAppendVideo = () => {
+  editingConfig.value.appendAid = undefined;
+  editingConfig.value.appendTitle = undefined;
 };
 
 const deleteConfig = async (index: number) => {
@@ -476,9 +557,10 @@ const pendingReasonText: Record<WatchUploadPending["reason"], string> = {
 
 const pendingColumns: DataTableColumns<WatchUploadPending> = [
   {
-    title: "文件名",
-    key: "filename",
+    title: "文件路径",
+    key: "path",
     ellipsis: { tooltip: true },
+    render: (row) => row.path,
   },
   {
     title: "原因",

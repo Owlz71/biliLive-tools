@@ -223,12 +223,11 @@ export class WatchUploadService {
     const prevSizes = this.fileSizeCache;
 
     const { ready } = this.evaluateFiles(item, files, prevSizes);
-    const newPaths = new Set(
-      watchUploadRecordService.filterNewPaths(ready.map((file) => file.path)),
-    );
+    const pendingFiles = this.isAppendMode(item)
+      ? this.selectAppendUploadFiles(ready)
+      : this.filterNewFiles(ready);
 
-    for (const file of ready) {
-      if (!newPaths.has(file.path)) continue;
+    for (const file of pendingFiles) {
       try {
         await this.uploadFile(file, item, uid);
       } catch (error) {
@@ -238,6 +237,55 @@ export class WatchUploadService {
 
     // 放在最后更新，保证本轮判定用的是上一轮的大小
     this.fileSizeCache = new Map(files.map((file) => [file.path, file.size]));
+  }
+
+  /** 过滤掉已经处理过的文件（非续传模式的默认行为） */
+  private filterNewFiles(files: FolderFile[]): FolderFile[] {
+    const newPaths = new Set(
+      watchUploadRecordService.filterNewPaths(files.map((file) => file.path)),
+    );
+    return files.filter((file) => newPaths.has(file.path));
+  }
+
+  /** 是否开启了「续传到已有视频」 */
+  private isAppendMode(item: WatchUploadConfigItem) {
+    return !!(item.appendVideo && item.appendAid);
+  }
+
+  /** 同一目标视频共用一个提交闸门 key，保证提交按入队顺序（即文件从旧到新）进行 */
+  private getSubmitGateKey(uid: number, aid: number) {
+    return `watch-upload:${uid}:${aid}`;
+  }
+
+  /**
+   * 续传模式下挑选本轮要上传的文件（从旧到新）
+   *
+   * 上传可以并行（真正决定分P顺序的是 edit 提交时刻），但要保证：
+   * 1. 已成功或已入队的文件跳过，继续看更新的文件
+   * 2. 遇到「失败冷却中」的更旧文件时停下 —— 否则更新的文件先上传成功，
+   *    旧文件重试时只能追加到最后，分P顺序就乱了
+   */
+  private selectAppendUploadFiles(ready: FolderFile[]): FolderFile[] {
+    if (ready.length === 0) return [];
+
+    const newPaths = new Set(
+      watchUploadRecordService.filterNewPaths(ready.map((file) => file.path)),
+    );
+    const statuses = watchUploadRecordService.getStatusesByPaths(ready.map((file) => file.path));
+
+    const result: FolderFile[] = [];
+    for (const file of ready) {
+      if (newPaths.has(file.path)) {
+        result.push(file);
+        continue;
+      }
+      const status = statuses[file.path];
+      // 已成功或已在队列中（提交顺序由闸门保证），继续看后面的文件
+      if (status === "success" || status === "uploading") continue;
+      // 失败冷却中：等它重试后再继续
+      break;
+    }
+    return result;
   }
 
   /**
@@ -324,6 +372,11 @@ export class WatchUploadService {
       throw new Error("文件不存在");
     }
 
+    // 续传模式：只允许上传当前最旧的未成功文件，避免分P顺序错乱
+    if (this.isAppendMode(item)) {
+      await this.ensureAppendUploadOrder(item, target);
+    }
+
     const stat = await fs.stat(target);
     const file: FolderFile = {
       path: target,
@@ -333,6 +386,31 @@ export class WatchUploadService {
       mtime: Math.floor(stat.mtimeMs),
     };
     return this.uploadFile(file, item, uid);
+  }
+
+  /**
+   * 续传模式下校验手动上传的文件是否允许（防止分P顺序错乱）
+   *
+   * 只允许上传「当前最旧的未成功文件」；如果它前面还有失败重试中的文件，
+   * 先上传它会让旧文件的重试只能追加到分P最后，因此直接拒绝。
+   */
+  private async ensureAppendUploadOrder(item: WatchUploadConfigItem, target: string) {
+    const files = await this.collectFiles(item);
+    const statuses = watchUploadRecordService.getStatusesByPaths(files.map((file) => file.path));
+
+    for (const file of files) {
+      const status = statuses[file.path];
+      if (path.resolve(file.path) === target) {
+        if (status === "success" || status === "uploading") {
+          throw new Error("该文件已上传或正在上传中");
+        }
+        return;
+      }
+      // 前面的文件都已成功或已在队列中（提交顺序由闸门保证）才允许
+      if (status !== "success" && status !== "uploading") {
+        throw new Error("存在更早的未上传文件，为保证分P顺序请先上传它");
+      }
+    }
   }
 
   /** 获取等待中的文件（页面"等待区"） */
@@ -508,23 +586,28 @@ export class WatchUploadService {
   /** 创建上传任务并写入记录 */
   private async uploadFile(file: FolderFile, item: WatchUploadConfigItem, uid: number) {
     const config = await this.prepareUploadConfig(item.uploadPresetId);
+    const appendAid = this.isAppendMode(item) ? item.appendAid : undefined;
 
     // 与「B站上传」页一样先校验投稿参数，不合法时直接记录错误，避免提交后才发现
-    const [valid, message] = biliApi.validateBiliupConfig(config);
-    if (!valid) {
-      const error = `投稿预设校验失败：${message}`;
-      log.error(`监听上传：${error}（${file.path}，预设 ${item.uploadPresetId}）`);
-      watchUploadRecordService.deleteByPath(file.path);
-      watchUploadRecordService.add({
-        path: file.path,
-        size: file.size,
-        mtime: file.mtime,
-        status: "error",
-        config_id: item.id,
-        task_id: null,
-        error,
-      });
-      return { taskId: "" };
+    // 续传（追加分P）走 editMedia，不使用主标题等稿件配置（分P标题由预设的分P标题模板/文件名决定），
+    // 与「B站上传」页的「续传」按钮一致，跳过该校验
+    if (!appendAid) {
+      const [valid, message] = biliApi.validateBiliupConfig(config);
+      if (!valid) {
+        const error = `投稿预设校验失败：${message}`;
+        log.error(`监听上传：${error}（${file.path}，预设 ${item.uploadPresetId}）`);
+        watchUploadRecordService.deleteByPath(file.path);
+        watchUploadRecordService.add({
+          path: file.path,
+          size: file.size,
+          mtime: file.mtime,
+          status: "error",
+          config_id: item.id,
+          task_id: null,
+          error,
+        });
+        return { taskId: "" };
+      }
     }
 
     // 手动重传时先重置旧记录，避免唯一索引冲突
@@ -542,17 +625,21 @@ export class WatchUploadService {
     log.info(
       `监听上传：添加任务 ${file.path}｜预设=${item.uploadPresetId}｜标题模板=${JSON.stringify(
         config.title,
-      )}｜分P标题模板=${JSON.stringify(config.partTitleTemplate)}`,
+      )}｜分P标题模板=${JSON.stringify(config.partTitleTemplate)}${
+        appendAid ? `｜续传=${appendAid}` : ""
+      }`,
     );
 
     try {
       // 与「B站上传」页的「立即上传」完全一致：走 POST /bili/upload
       const { taskId } = await this.requestUpload({
         uid,
+        vid: appendAid,
         videos: [{ path: file.path, title: path.parse(file.path).name }],
         config,
         options: {
           removeOriginAfterUploadCheck: item.removeOriginAfterUploadCheck,
+          submitGateKey: appendAid ? this.getSubmitGateKey(uid, appendAid) : undefined,
         },
       });
 
@@ -585,9 +672,10 @@ export class WatchUploadService {
    */
   private async requestUpload(payload: {
     uid: number;
+    vid?: number;
     videos: { path: string; title: string }[];
     config: BiliupConfig;
-    options: { removeOriginAfterUploadCheck: boolean };
+    options: { removeOriginAfterUploadCheck: boolean; submitGateKey?: string };
   }): Promise<{ taskId: string }> {
     const host = this.appConfig.get("host");
     const port = this.appConfig.get("port");

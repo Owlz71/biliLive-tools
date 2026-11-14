@@ -110,6 +110,7 @@ router.post("/upload", async (ctx) => {
     config: BiliupConfig;
     options?: {
       removeOriginAfterUploadCheck?: boolean;
+      submitGateKey?: string;
     };
   };
   if (!data.uid) {
@@ -138,6 +139,7 @@ router.post("/upload", async (ctx) => {
       afterUploadDeletAction: data.options?.removeOriginAfterUploadCheck
         ? "deleteAfterCheck"
         : "none",
+      submitGateKey: data.options?.submitGateKey,
     });
     ctx.body = {
       taskId: task.taskId,

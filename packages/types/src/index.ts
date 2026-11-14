@@ -915,6 +915,12 @@ export interface AppConfig {
       ignoreFileRegex: string;
       /** 审核通过后移除源文件 */
       removeOriginAfterUploadCheck: boolean;
+      /** 是否续传到已有视频：开启后新文件作为新分P追加到该视频，不再新建稿件 */
+      appendVideo?: boolean;
+      /** 续传目标视频的 aid */
+      appendAid?: number;
+      /** 续传目标视频标题（仅用于界面展示） */
+      appendTitle?: string;
     }[];
   };
 }

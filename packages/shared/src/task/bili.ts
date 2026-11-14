@@ -19,6 +19,7 @@ import log from "../utils/log.js";
 import { sleep, encrypt, decrypt, getTempPath, trashItem, uuid } from "../utils/index.js";
 import { sendNotify } from "../notify.js";
 import { getBinPath, pasrseMetadata } from "./video.js";
+import { createSubmitGate } from "./core/submitGate.js";
 import { formatTitle, formatPartTitle, formatDesc, buildRoomLink } from "../utils/webhook.js";
 
 import type { BiliupConfig, BiliUser, AppConfig as AppConfigType } from "@biliLive-tools/types";
@@ -869,6 +870,8 @@ export async function editMedia(
     // 用于排序，按照列表顺序排序，cid可能为空，如果cid为空从上传分P件名中提取cid
     sortParams?: { filePath: string; cid?: number }[];
     checkCallback?: (status: "completed" | "error") => void;
+    /** 提交顺序闸门 key：相同 key 的任务按创建顺序依次提交（上传并行、提交顺序） */
+    submitGateKey?: string;
   },
 ) {
   if (filePath.length === 0) {
@@ -881,6 +884,10 @@ export async function editMedia(
   const client = createClient(uid);
   const title = videos[0].title;
 
+  const submitGate = extraOptions?.submitGateKey
+    ? createSubmitGate(extraOptions.submitGateKey)
+    : undefined;
+
   const pTask = new BiliEditVideoTask(
     {
       name: `编辑稿件：${title}`,
@@ -888,6 +895,7 @@ export async function editMedia(
       mediaOptions: formattedOptions,
       aid,
       sortParams: extraOptions?.sortParams,
+      submitGate,
     },
     {
       onEnd: async () => {
